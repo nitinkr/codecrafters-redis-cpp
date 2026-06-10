@@ -71,13 +71,15 @@ void Server::start() {
         }
         std::cout << "client connected" << std::endl;
         char buff[1024];
-        recv(new_fd, buff, 1024, 0);
-        std::string str = "+PONG\r\n";
+        int byte_recved;
+        while((byte_recved = recv(new_fd, buff, 1024, 0))  > 0) {
+            std::string str = "+PONG\r\n";
         
-        auto send_r  = send(new_fd, str.c_str(), str.length(), 0);
-        if(send_r == -1) {
-            std::cout << "error in send " << std::endl;
-            std::cerr << strerror(errno) << std::endl;
+            auto send_r  = send(new_fd, str.c_str(), str.length(), 0);
+            if(send_r == -1) {
+                std::cout << "error in send " << std::endl;
+                std::cerr << strerror(errno) << std::endl;
+            }
         }
     }
     close(sockfd);
