@@ -1,5 +1,5 @@
-#include <asm-generic/socket.h>
 #include <cerrno>
+#include <cstdio>
 #include <iostream>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -19,9 +19,9 @@ void Server::start() {
     int rv;
 
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family   = AF_INET;
-    hints.ai_socktype = SOCK_STREAM; 
-    hints.ai_flags    = AI_PASSIVE;
+    hints.ai_family      = AF_INET;
+    hints.ai_socktype    = SOCK_STREAM; 
+    hints.ai_flags       = AI_PASSIVE;
     std::string port_str = std::to_string(port_);
 
     if ((rv = getaddrinfo(NULL, port_str.c_str(), &hints, &servinfo)) != 0) {
@@ -33,6 +33,7 @@ void Server::start() {
     for(auto p = servinfo; p != nullptr; p = p->ai_next) {
         if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
             std::cerr << "server: socket" << std::endl;
+            perror("server:socket");
             continue;
         }
 
