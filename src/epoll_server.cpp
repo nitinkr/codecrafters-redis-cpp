@@ -9,7 +9,56 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include "epoll_server.h"
+#include "resp_parser.h"
+#include "cmd_router.h"
 
+void EpollServer::del_connection(Connection *conn) {
+    if(conn != nullptr) {
+        epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, conn->fd_, nullptr);
+        close(conn->fd_);
+        delete conn;
+    }
+}
+
+void EpollServer::handle_write(Connection *conn) {
+    int byte_sent = send(conn->fd_, conn->send_buff_ + conn->send_idx_, conn->send_len_ - conn->send_idx_, 0);
+    if(byte_sent == -1) {
+        return;
+    }
+    conn->send_idx_ += byte_sent;
+
+    if(conn->send_idx_ == conn->send_len_) {
+        conn->send_idx_ = conn->send_len_ = 0; 
+        struct epoll_event ev;
+        ev.data.ptr = conn;
+        ev.events   = EPOLLIN;
+        epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, conn->fd_, &ev);
+    }
+}
+
+
+int EpollServer::handle_read(Connection  *conn) {
+    int bytes_received = recv(conn->fd_, conn->recv_buff_ + conn->recv_idx_, BUFFERSIZE - conn->recv_idx_, 0);        
+    std::cout << "bytes_revceived " << bytes_received << std::endl;
+    if(bytes_received <= 0) {
+        if(bytes_received == 0) {
+            std::cout << "closing connection " << std::endl;
+            del_connection(conn);
+        }
+        return bytes_received;
+    }
+    for(int i = conn->recv_idx_; i < conn->recv_idx_ + bytes_received; i++) {
+        std::cout << conn->recv_buff_[i];
+    }
+    std::cout << std::endl;
+        
+    conn->recv_idx_ = bytes_received;
+    struct epoll_event ev;
+    ev.data.ptr = conn;
+    ev.events   = EPOLLOUT;
+    epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, conn->fd_, &ev);
+    return bytes_received;
+}
 
 int EpollServer::create_bind_listen() {
     int sockfd;
@@ -17,7 +66,7 @@ int EpollServer::create_bind_listen() {
     int reuse = 1;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family   = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_socktype =SOCK_STREAM;
     hints.ai_flags    = AI_PASSIVE;
     std::string port_str = std::to_string(port_);
 
@@ -67,66 +116,83 @@ void EpollServer::handle_new_connection() {
         return;
     }
     epoll_event ev;
-    ev.data.fd = client_fd;
+    Connection *conn = new Connection(client_fd); 
+    ev.data.ptr = conn;
     ev.events  = EPOLLIN;
     epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, client_fd, &ev); 
 }
 
 void EpollServer::start() {
     sockfd_ = create_bind_listen();
-    int new_fd, num_fds;
+    int new_fd, num_fds, bytes_received;
     socklen_t sin_size;
     char send_buff[1024], recv_buff[1024];
-    int byte_received;
+    Connection *conn = nullptr;
     struct sockaddr_storage client_addr;
     struct epoll_event epoll_ev, events[MAXEVENT];
     char s[INET6_ADDRSTRLEN];
 
     epoll_fd_ = epoll_create1(EPOLL_CLOEXEC);
     epoll_ev.events    = EPOLLIN;
-    epoll_ev.data.fd   = sockfd_; 
-
+    conn = new Connection(sockfd_);
+    epoll_ev.data.ptr = conn;
     epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, sockfd_, &epoll_ev); 
-
+    int t = 0;
     while(true) {
+        std::cout << "waiting t= " << (t++) << std::endl;
         num_fds = epoll_wait(epoll_fd_, events, MAXEVENT, -1);
- 
         for(int i=0; i < num_fds; i++) {
-            new_fd = events[i].data.fd;
+            conn   = (Connection *) events[i].data.ptr;
+            new_fd = conn->fd_;
+            std::cout << "procssing event for fd: " << new_fd << std::endl;
             if(is_error_event(events[i].events)) {
+                std::cout << "found error event " << new_fd << std::endl;
+                del_connection(conn);
                 if(new_fd == sockfd_) {
                     perror("error on server socket");
-                    close(sockfd_);
                     close(epoll_fd_);
                     exit(1);
                 }
-                epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, new_fd, nullptr);
-                close(new_fd);
                 continue;
             }
             
             if(new_fd == sockfd_) {
+                std::cout << "handling new connection on fd " << new_fd << std::endl;
                 handle_new_connection();
             } else if(events[i].events & EPOLLIN) {
-                byte_received = recv(new_fd, recv_buff, BUFFERSIZE, 0);
-                if(byte_received <= 0) {
-                    epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, new_fd, nullptr);
-                    close(new_fd);
-                    continue;
-                }
-                epoll_ev.events    = EPOLLOUT;
-                epoll_ev.data.fd   = new_fd;
-                epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, new_fd, &epoll_ev);
+                std::cout << "procesing read on clint fd " << new_fd << std::endl;
+                bytes_received = handle_read(conn);
+                std::cout << "done with read " << std::endl;
+                if(bytes_received > 0) process_command(conn);
+                std::cout << "done with process_command " << std::endl;
             } else if(events[i].events & EPOLLOUT) {
-                // handle write();
-                std::string pong = "+PONG\r\n";
-                send(new_fd, pong.c_str(), pong.length(), 0);
-                epoll_ev.events  = EPOLLIN;
-                epoll_ev.data.fd = new_fd; 
-                epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, new_fd, &epoll_ev);
+                std::cout << "handling write event for client fd " << new_fd << std::endl;
+                handle_write(conn);
             }
         }
     }
     close(sockfd_);
     close(epoll_fd_);
+}
+
+bool EpollServer::process_command(Connection *conn) {
+    RespParser r(conn);
+    r.parse();
+    if(!r.IsValid()) {
+        // the bytes are not valid command or command sequence
+        // we wait for more bytes to arrive
+        epoll_event ev;
+        ev.data.ptr = conn;
+        ev.events   = EPOLLIN;
+        epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, conn->fd_, &ev);
+        return false;
+    }
+    CmdRouter cmdr;
+    cmdr.process(conn->fd_, r.get_values());
+    for(auto& str : cmdr.get_results()) {
+        memcpy(conn->send_buff_ + conn->send_len_, str.c_str(), str.length()); 
+        conn->send_len_ += str.length();
+    }
+    conn->recv_idx_ = 0;
+    return true;
 }
