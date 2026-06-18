@@ -1,4 +1,3 @@
-
 #define BACKLOG 10
 
 class Server {

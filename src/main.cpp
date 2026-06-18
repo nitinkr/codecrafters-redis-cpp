@@ -33,7 +33,7 @@ void test_main() {
         "*2\r\n$3\r\nGET\r\n$3\r\nfoo\r\n",
         "*1\r\n$4\r\nPING\r\n",
         "*3\r\n$3\r\nSET\r\n$4\r\nname\r\n$5\r\nAlice\r\n",
-            "*0\r\n",
+        "*0\r\n",
         "*2\r\n$4\r\nLPOP\r\n$0\r\n\r\n",
         "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$0\r\n\r\n",
     };

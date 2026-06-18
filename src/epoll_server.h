@@ -2,23 +2,14 @@
 #define  EPOLL_SERVER_H
 
 #include <sys/epoll.h>
-#define BACKLOG  20
-#define MAXEVENT 128
-#define BUFFERSIZE 4096 
+#include "in_memory_store.h"
+#include "cmd_router.h"
+#include "redis_types.h"
 
-struct Connection {
-    Connection(int fd): fd_(fd) {} 
-    int  fd_;
-    int  recv_idx_   = 0;
-    int  send_idx_ = 0; 
-    int  send_len_ = 0;
-    char recv_buff_[BUFFERSIZE] = {0};
-    char send_buff_[BUFFERSIZE] = {0};
-};
 
 class EpollServer {
 public:
-    EpollServer(int port) : port_(port), sockfd_(-1), epoll_fd_(-1) {};
+    EpollServer(int port) : port_(port), sockfd_(-1), epoll_fd_(-1), router_(in_memory_store_) {}
     void start();
 private:
     int  create_bind_listen();
@@ -30,6 +21,8 @@ private:
     bool is_error_event(uint32_t ev) { return (ev & (EPOLLHUP | EPOLLERR)); } 
     int port_;
     int sockfd_, epoll_fd_;
+    InMemoryStore in_memory_store_;
+    CmdRouter router_;
 };
 
 #endif

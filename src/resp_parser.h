@@ -6,31 +6,7 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
-#include "epoll_server.h"
-
-struct RespValue {
-    enum Type {
-        STRING,
-        NUMBER,
-        NULL_STRING,
-        INTEGER64,
-        DOUBLE,
-        BIGNUMBER,
-    };
-    std::variant<std::string, int64_t, double> value_;
-    Type type_;
-    std::string to_string() {
-        return  std::visit(
-              [](auto &arg) -> std::string {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                return arg;
-            } else {
-                return std::to_string(arg);
-            }
-        }, value_);
-    }
-};
+#include "redis_types.h"
 
 class RespParser {
 public:
