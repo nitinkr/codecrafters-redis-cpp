@@ -67,4 +67,15 @@ void CmdRouter::init_cmd_reg() {
             }
             return RespEncoder::null_bulk_str_;
         };
+
+        cmds_["RPUSH"] = [this](std::vector<RespValue>& tokens, int &id) -> std::string {
+            if (id + 1 >= tokens.size()) {       
+                return RespEncoder::encode_error("Invalid command");
+            }
+            std::string key   = tokens[id++].to_string();
+            std::string value = tokens[id++].to_string();
+
+            auto len = in_memory_store_.append(key, value); 
+            return RespEncoder::encode_int(len); 
+        };
 }
