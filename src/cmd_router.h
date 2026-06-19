@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <functional>
 #include <unordered_map>
 #include <vector>
@@ -12,6 +13,7 @@ public:
     std::vector<std::string> process(int txn_id, std::vector<RespValue>& tokens);
 private:
     void init_cmd_reg();
-    std::unordered_map<std::string, std::function<std::string(std::vector<RespValue>&, int &id)>> cmds_;
+    int64_t parse_timestamp(std::vector<RespValue> &tokens, int &id);
+    std::unordered_map<std::string, std::function<std::string(std::vector<RespValue>&, int&)>> cmds_;
     InMemoryStore &in_memory_store_;
 };

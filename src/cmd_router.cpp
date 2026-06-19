@@ -1,3 +1,6 @@
+#include <cstdint>
+#include <string>
+#include <iostream>
 #include "cmd_router.h"
 #include "resp_encoder.h"
 
@@ -16,6 +19,22 @@ std::vector<std::string> CmdRouter::process(int txn_id, std::vector<RespValue>& 
     return results;
 }
 
+int64_t CmdRouter::parse_timestamp(std::vector<RespValue> &tokens, int &id) {
+    if (id == tokens.size()) {
+        return -1;
+    }
+    int64_t ts;
+    std::string arg = tokens[id].to_string();
+    if (arg == "PX" || arg == "EX") {
+       id++;
+       if(id < tokens.size()) {
+           ts = std::stoll(tokens[id++].to_string());
+           if(arg == "EX") ts *= 1000;
+        }
+    }
+    return ts;
+}
+
 void CmdRouter::init_cmd_reg() {
         cmds_["PING"] = [this](std::vector<RespValue>& tokens, int &id) -> std::string {
             return RespEncoder::pong_;
@@ -31,9 +50,12 @@ void CmdRouter::init_cmd_reg() {
             }
             std::string key   = tokens[id++].to_string();
             std::string value = tokens[id++].to_string();
-            in_memory_store_.set(key, value);
+            std::cout << " in set lambda " << key << " " << value << std::endl;
+            int64_t     ts = parse_timestamp(tokens, id);
+            in_memory_store_.set(key, value, ts);
             return RespEncoder::simple_ok_;
         };
+
         cmds_["GET"] = [this](std::vector<RespValue>& tokens, int &id) -> std::string {
             if (id >= tokens.size()) {
                return RespEncoder::encode_error("Invalid command" ); 

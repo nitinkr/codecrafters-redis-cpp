@@ -36,6 +36,7 @@ void test_main() {
         "*0\r\n",
         "*2\r\n$4\r\nLPOP\r\n$0\r\n\r\n",
         "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$0\r\n\r\n",
+        "*3\r\n$3\r\nSET\r\n$10\r\nstrawberry\r\n$6\r\nbanana\r\n",
     };
 
     for(auto& s : strs) {

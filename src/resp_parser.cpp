@@ -90,6 +90,7 @@ void RespParser::parse_bulk_string() {
     std::string value;
     v.type_ = RespValue::STRING;
     if(current_ + len >= length_ || len < -1) {
+        std::cout << "current_ " << current_ << " len " << len << " length_ " << length_ << std::endl;
         is_valid_ = false;
         return;
     }
