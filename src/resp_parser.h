@@ -13,8 +13,9 @@ public:
     RespParser(Connection *conn) : buff_(conn->recv_buff_), length_(conn->recv_idx_),
                                    current_(0), is_valid_(true) {};
     bool IsValid() { return is_valid_; }
+    bool parse_all();
     bool parse();
-    std::vector<RespValue>& get_values() { return values_; }
+    std::vector<Command>& get_cmds() { return cmds_; }
 private:
     void parse_string();
     void parse_simple_string();
@@ -32,4 +33,5 @@ private:
     const int length_;
     bool  is_valid_;
     std::vector<RespValue> values_;
+    std::vector<Command> cmds_;
 };

@@ -1,6 +1,7 @@
 #pragma once 
 #include <string>
 #include <variant>
+#include <vector>
 #define BACKLOG  20
 #define MAXEVENT 128
 #define BUFFERSIZE 4096 
@@ -36,5 +37,16 @@ struct RespValue {
                 return std::to_string(arg);
             }
         }, value_);
+    }
+};
+
+struct Command {
+    std::string name;
+    std::vector<RespValue> args;
+    Command(std::vector<RespValue>& tokens) {
+        name = tokens[0].to_string();
+        for (int i=1; i<tokens.size(); i++) {
+            args.push_back(tokens[i]);
+        }
     }
 };

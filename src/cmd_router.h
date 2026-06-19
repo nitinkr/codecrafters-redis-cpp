@@ -10,10 +10,11 @@
 class CmdRouter {
 public:
     CmdRouter(InMemoryStore &ims) : in_memory_store_(ims) { init_cmd_reg(); }
-    std::vector<std::string> process(int txn_id, std::vector<RespValue>& tokens);
+    std::vector<std::string> process(int txn_id, std::vector<Command>& tokens);
 private:
     void init_cmd_reg();
-    int64_t parse_timestamp(std::vector<RespValue> &tokens, int &id);
-    std::unordered_map<std::string, std::function<std::string(std::vector<RespValue>&, int&)>> cmds_;
+    std::string process_cmd(Command &cmd);
+    int64_t parse_timestamp(Command &cmd);
+    std::unordered_map<std::string, std::function<std::string(Command&)>> cmds_;
     InMemoryStore &in_memory_store_;
 };

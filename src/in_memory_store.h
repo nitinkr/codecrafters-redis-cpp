@@ -8,7 +8,7 @@ class InMemoryStore {
 public:
     void set(const std::string& key, const std::string& value, int64_t ts);
     bool get(const std::string& key, std::string &value);
-    int append(const std::string& list, std::string& value);
+    int append(const std::string& list, std::vector<std::string>& value);
 private:
     int64_t current_time();
     bool is_expired(const std::string &key);

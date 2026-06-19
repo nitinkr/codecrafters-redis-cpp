@@ -48,10 +48,10 @@ bool InMemoryStore::get(const std::string& key, std::string &value) {
     return false;
 }
 
-int InMemoryStore::append(const std::string& list, std::string& value) {
+int InMemoryStore::append(const std::string& list, std::vector<std::string>& values) {
     auto& v = lists_[list];
-    v.push_back(value);
+    for(auto& value : values) {
+        v.push_back(value);
+    }
     return v.size();
 }
-
-

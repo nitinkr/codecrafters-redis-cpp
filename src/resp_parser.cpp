@@ -10,6 +10,15 @@ void to_upper(std::string &str) {
     }
 }
 
+bool RespParser::parse_all() {
+    while(is_valid_ && !is_end()) {
+        parse();
+        cmds_.emplace_back(values_);
+        values_.clear();
+    }
+    return is_valid_;
+}
+
 bool RespParser::parse() {
     if(is_end()) return is_valid_;
     char ch = peek();

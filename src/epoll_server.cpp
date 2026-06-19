@@ -177,7 +177,7 @@ void EpollServer::start() {
 
 bool EpollServer::process_command(Connection *conn) {
     RespParser r(conn);
-    r.parse();
+    r.parse_all();
     if(!r.IsValid()) {
         // the bytes are not valid command or command sequence
         // we wait for more bytes to arrive
@@ -187,7 +187,7 @@ bool EpollServer::process_command(Connection *conn) {
         epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, conn->fd_, &ev);
         return false;
     }
-    auto results = router_.process(conn->fd_, r.get_values());
+    auto results = router_.process(conn->fd_, r.get_cmds());
     for(auto& str : results) {
         memcpy(conn->send_buff_ + conn->send_len_, str.c_str(), str.length()); 
         conn->send_len_ += str.length();

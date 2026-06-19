@@ -1,66 +1,69 @@
+#include <cassert>
 #include <cstdint>
 #include <string>
 #include <iostream>
 #include "cmd_router.h"
+#include "redis_types.h"
 #include "resp_encoder.h"
 
-std::vector<std::string> CmdRouter::process(int txn_id, std::vector<RespValue>& tokens) {
-    int start = 0;
-    std::string str;
+
+std::string CmdRouter::process_cmd(Command &cmd) {
+    if (auto it = cmds_.find(cmd.name); it != cmds_.end()) {  
+        return it->second(cmd);
+    }
+    return RespEncoder::encode_error("cmd not found");
+}
+
+std::vector<std::string> CmdRouter::process(int txn_id, std::vector<Command>& commands) {
     std::vector<std::string> results;
-    while(start < tokens.size()) {
-        str = tokens[start++].to_string();
-        if(auto it = cmds_.find(str); it != cmds_.end()) {
-            results.push_back(it->second(tokens, start));
-        } else {
-            results.push_back(RespEncoder::encode_error("cmd not found"));
-        }
+    for(auto c : commands) {
+        results.push_back(process_cmd(c));
     }
     return results;
 }
 
-int64_t CmdRouter::parse_timestamp(std::vector<RespValue> &tokens, int &id) {
-    if (id == tokens.size()) {
+int64_t CmdRouter::parse_timestamp(Command &cmd) {
+    assert(cmd.name == "SET");
+    if (cmd.args.size() < 4) {
         return -1;
     }
     int64_t ts;
-    std::string arg = tokens[id].to_string();
+    std::string arg = cmd.args[2].to_string();
     if (arg == "PX" || arg == "EX") {
-       id++;
-       if(id < tokens.size()) {
-           ts = std::stoll(tokens[id++].to_string());
-           if(arg == "EX") ts *= 1000;
-        }
+        ts = std::stoll(cmd.args[3].to_string());
+        if(arg == "EX") ts *= 1000;
     }
     return ts;
 }
 
 void CmdRouter::init_cmd_reg() {
-        cmds_["PING"] = [this](std::vector<RespValue>& tokens, int &id) -> std::string {
+        cmds_["PING"] = [this](Command&) -> std::string {
             return RespEncoder::pong_;
         };
 
-        cmds_["ECHO"] = [this](std::vector<RespValue>& tokens, int &id) -> std::string {
-            return RespEncoder::encode_string(tokens[id++].to_string());
+        cmds_["ECHO"] = [this](Command &cmd) -> std::string {
+            assert(cmd.args.size() == 1);
+            return RespEncoder::encode_string(cmd.args[0].to_string());
         };
 
-        cmds_["SET"] = [this](std::vector<RespValue>& tokens, int &id) -> std::string {
-            if (id + 1 >= tokens.size()) {
+        cmds_["SET"] = [this](Command &cmd) -> std::string {
+            if (cmd.args.size() < 2) {
                 return RespEncoder::encode_error("Invalid command");
             }
-            std::string key   = tokens[id++].to_string();
-            std::string value = tokens[id++].to_string();
+            std::string key   = cmd.args[0].to_string();
+            std::string value = cmd.args[1].to_string();
             std::cout << " in set lambda " << key << " " << value << std::endl;
-            int64_t     ts = parse_timestamp(tokens, id);
+            int64_t     ts = parse_timestamp(cmd);
             in_memory_store_.set(key, value, ts);
             return RespEncoder::simple_ok_;
         };
 
-        cmds_["GET"] = [this](std::vector<RespValue>& tokens, int &id) -> std::string {
-            if (id >= tokens.size()) {
+        cmds_["GET"] = [this](Command &cmd) -> std::string {
+            assert(cmd.name == "GET");
+            if (cmd.args.size() == 0) {
                return RespEncoder::encode_error("Invalid command" ); 
             }
-            auto key = tokens[id++].to_string(); 
+            auto key = cmd.args[0].to_string();
             std::string value;
             if(in_memory_store_.get(key, value)) {
                 return RespEncoder::encode_string(value);
@@ -68,14 +71,12 @@ void CmdRouter::init_cmd_reg() {
             return RespEncoder::null_bulk_str_;
         };
 
-        cmds_["RPUSH"] = [this](std::vector<RespValue>& tokens, int &id) -> std::string {
-            if (id + 1 >= tokens.size()) {       
-                return RespEncoder::encode_error("Invalid command");
-            }
-            std::string key   = tokens[id++].to_string();
-            std::string value = tokens[id++].to_string();
-
-            auto len = in_memory_store_.append(key, value); 
+        cmds_["RPUSH"] = [this](Command &cmd) -> std::string {
+            assert(cmd.name == "RPUSH");
+            std::string key   = cmd.args[0].to_string();
+            std::vector<std::string> args;
+            for(int i=1; i<cmd.args.size(); i++) { args.push_back(cmd.args[i].to_string()); }
+            auto len = in_memory_store_.append(key, args); 
             return RespEncoder::encode_int(len); 
         };
 }

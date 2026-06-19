@@ -12,6 +12,7 @@
 #include "resp_parser.h"
 
 #define PORT 6379
+/*
 void test(std::string& str) {
     std::cout << "*****parsing str ******** " << str << std::endl;
     Connection c(-1);
@@ -91,7 +92,7 @@ void test_set() {
         else std::cout <<  std::get<std::string>(v.value_) << std::endl;
     }
 }
-
+*/
 int main(int argc, char **argv) {
   // Flush after every std::cout / std::cerr
   std::cout << std::unitbuf;
@@ -101,7 +102,7 @@ int main(int argc, char **argv) {
       std::cout << "i: " << i << " " << argv[i] << std::endl;
   }
   if (argc >= 2 && strcmp(argv[1], "test") == 0) {
-    test_main();
+    //test_main();
     return 0;
   }
   EpollServer s(PORT);
