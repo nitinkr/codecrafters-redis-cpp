@@ -9,6 +9,8 @@ public:
     void set(const std::string& key, const std::string& value, int64_t ts);
     bool get(const std::string& key, std::string &value);
     int append(const std::string& list, std::vector<std::string>& value);
+    std::vector<std::string> lrang(const std::string& list, int start, int end);
+    
 private:
     int64_t current_time();
     bool is_expired(const std::string &key);

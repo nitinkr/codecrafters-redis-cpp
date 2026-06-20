@@ -79,4 +79,16 @@ void CmdRouter::init_cmd_reg() {
             auto len = in_memory_store_.append(key, args); 
             return RespEncoder::encode_int(len); 
         };
+
+        cmds_["LRANGE"] = [this](Command &cmd) -> std::string {
+            assert(cmd.name == "LRANGE");
+            if(cmd.args.size() < 3) {
+                return RespEncoder::encode_error("Invalid command");
+            }
+            std::string key = cmd.args[0].to_string();
+            auto start = std::stoll(cmd.args[1].to_string());
+            auto end   = std::stoll(cmd.args[2].to_string());
+            auto res = in_memory_store_.lrang(key, start, end);
+            return RespEncoder::encode_array(res);
+        };
 }

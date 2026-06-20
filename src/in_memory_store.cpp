@@ -48,6 +48,17 @@ bool InMemoryStore::get(const std::string& key, std::string &value) {
     return false;
 }
 
+std::vector<std::string> InMemoryStore::lrang(const std::string& list, int start, int end) {
+    std::vector<std::string> result;
+    if (auto it = lists_.find(list); it != lists_.end()) {
+        auto& v = it->second;
+        while(start <= end && start < v.size()) {
+            result.push_back(v[start++]);
+        }
+    }
+    return result;
+}
+
 int InMemoryStore::append(const std::string& list, std::vector<std::string>& values) {
     auto& v = lists_[list];
     for(auto& value : values) {

@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include<string>
+#include <vector>
 
 class RespEncoder {
 public:
@@ -10,4 +11,5 @@ public:
     static std::string encode_int(int64_t i) { return ":" + std::to_string(i) + "\r\n"; }
     static std::string encode_string(const std::string &str);
     static std::string encode_error(const std::string  &str) { return str;}
+    static std::string encode_array(std::vector<std::string>& arr);
 };
