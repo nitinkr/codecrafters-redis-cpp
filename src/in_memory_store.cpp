@@ -48,7 +48,7 @@ bool InMemoryStore::get(const std::string& key, std::string &value) {
     return false;
 }
 
-std::vector<std::string> InMemoryStore::lrang(const std::string& list, int start, int end) {
+std::vector<std::string> InMemoryStore::list_range(const std::string& list, int start, int end) {
     std::vector<std::string> result;
     std::cout << "start " << start << "end " << end << std::endl;
     if (auto it = lists_.find(list); it != lists_.end()) {
@@ -72,7 +72,7 @@ int InMemoryStore::list_length(const std::string& list) {
     return 0;
 }
 
-int InMemoryStore::prepend(const std::string& list, std::vector<std::string>& values) {
+int InMemoryStore::list_prepend(const std::string& list, std::vector<std::string>& values) {
     if(values.size() == 0) return 0;
     auto& v = lists_[list];
     for(auto& val : values) {
@@ -81,10 +81,25 @@ int InMemoryStore::prepend(const std::string& list, std::vector<std::string>& va
     return v.size();
 }
 
-int InMemoryStore::append(const std::string& list, std::vector<std::string>& values) {
+int InMemoryStore::list_append(const std::string& list, std::vector<std::string>& values) {
     auto& v = lists_[list];
     for(auto& value : values) {
         v.push_back(value);
     }
     return v.size();
 }
+
+std::vector<std::string> InMemoryStore::list_pop(const std::string& list, int count) {
+    // std::cout << "list pop called to pop " << count << " from " << list << std::endl; 
+    std::vector<std::string> result;
+    if (auto it = lists_.find(list); it != lists_.end()) {
+        auto& l = it->second;
+        while(!l.empty() && count) {
+            result.push_back(l.front());
+            l.pop_front();
+            count--;
+        }
+    }
+    return result;
+}
+

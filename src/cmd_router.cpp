@@ -76,7 +76,7 @@ void CmdRouter::init_cmd_reg() {
             std::string key   = cmd.args[0].to_string();
             std::vector<std::string> args;
             for(int i=1; i<cmd.args.size(); i++) { args.push_back(cmd.args[i].to_string()); }
-            auto len = in_memory_store_.append(key, args); 
+            auto len = in_memory_store_.list_append(key, args); 
             return RespEncoder::encode_int(len); 
         };
 
@@ -88,7 +88,7 @@ void CmdRouter::init_cmd_reg() {
             std::string key = cmd.args[0].to_string();
             auto start = std::stoll(cmd.args[1].to_string());
             auto end   = std::stoll(cmd.args[2].to_string());
-            auto res = in_memory_store_.lrang(key, start, end);
+            auto res = in_memory_store_.list_range(key, start, end);
             return RespEncoder::encode_array(res);
         };
 
@@ -101,7 +101,7 @@ void CmdRouter::init_cmd_reg() {
             // TODO move to span
             std::vector<std::string> values;
             for(int i=1; i< cmd.args.size(); i++) { values.push_back(cmd.args[i].to_string()); }
-            return RespEncoder::encode_int(in_memory_store_.prepend(key,values));
+            return RespEncoder::encode_int(in_memory_store_.list_prepend(key,values));
         };
 
         cmds_["LLEN"] = [this](Command &cmd) -> std::string {
@@ -110,5 +110,16 @@ void CmdRouter::init_cmd_reg() {
                 return RespEncoder::encode_error("Invalid command");
             }
             return RespEncoder::encode_int(in_memory_store_.list_length(cmd.args[0].to_string()));
+        };
+        cmds_["LPOP"] = [this](Command &cmd) -> std::string {
+            assert(cmd.name == "LPOP");
+            if (cmd.args.size() == 0) {
+                return RespEncoder::encode_error("Inavlid command");
+            }
+            auto count = (cmd.args.size() < 2) ? 1 : std::stoll(cmd.args[1].to_string());
+            auto v = in_memory_store_.list_pop(cmd.args[0].to_string(), count);
+            // std::cout << "DOne with LPOP " << v.size() << std::endl;
+            if(v.size() == 1) return RespEncoder::encode_string(v[0]);
+            return v.size() ? RespEncoder::encode_array(v) : RespEncoder::null_bulk_str_;
         };
 }
