@@ -11,6 +11,7 @@ public:
     bool get(const std::string& key, std::string &value);
     int append(const std::string& list, std::vector<std::string>& value);
     int prepend(const std::string& list, std::vector<std::string>& values);
+    int list_length(const std::string& list);
     std::vector<std::string> lrang(const std::string& list, int start, int end);
     
 private:

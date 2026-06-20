@@ -65,6 +65,13 @@ std::vector<std::string> InMemoryStore::lrang(const std::string& list, int start
     return result;
 }
 
+int InMemoryStore::list_length(std::string& list) {
+    if (auto it = lists_.find(list); it != lists_.end()) {
+        return it->second.size();
+    }
+    return 0;
+}
+
 int InMemoryStore::prepend(const std::string& list, std::vector<std::string>& values) {
     if(values.size() == 0) return 0;
     auto& v = lists_[list];

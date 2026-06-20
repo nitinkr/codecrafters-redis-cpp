@@ -103,4 +103,12 @@ void CmdRouter::init_cmd_reg() {
             for(int i=1; i< cmd.args.size(); i++) { values.push_back(cmd.args[i].to_string()); }
             return RespEncoder::encode_int(in_memory_store_.prepend(key,values));
         };
+
+        cmds_["LLEN"] = [this](Command &cmd) -> std::string {
+            assert(cmd.name == "LLEN");
+            if (cmd.args.size() != 1) {
+                return RespEncoder::encode_error("Invalid command");
+            }
+            return RespEncoder::encode_int(in_memory_store_.list_length(cmd.args[0].to_string()));
+        };
 }
