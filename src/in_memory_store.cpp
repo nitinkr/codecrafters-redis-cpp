@@ -26,7 +26,6 @@ int64_t InMemoryStore::current_time() {
 bool InMemoryStore::is_expired(const std::string &key) {
     if (auto it = timestamps_.find(key); it != timestamps_.end()) {
         auto ts = current_time();
-        std::cout << "in is_expired cur ts" << ts << " -- old ts " << it->second << std::endl;  
         return ts >= it->second;
     }
     return false;
@@ -50,8 +49,13 @@ bool InMemoryStore::get(const std::string& key, std::string &value) {
 
 std::vector<std::string> InMemoryStore::lrang(const std::string& list, int start, int end) {
     std::vector<std::string> result;
+    std::cout << "start " << start << "end " << end << std::endl;
     if (auto it = lists_.find(list); it != lists_.end()) {
         auto& v = it->second;
+        int size = v.size();
+        start = (start < 0) ? std::max(0, size + start) : start;
+        end   = (end   < 0) ? std::max(0, size + end )  : end;
+        std::cout << "start " << start << "end " << end << " v.size() " << v.size() << std::endl;
         while(start <= end && start < v.size()) {
             result.push_back(v[start++]);
         }
