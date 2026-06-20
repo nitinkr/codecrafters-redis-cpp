@@ -3,6 +3,7 @@
 #include <ctime>
 #include <string>
 #include <iostream>
+#include <list>
 #include "in_memory_store.h"
 
 void InMemoryStore::set(const std::string& key, const std::string& value, int64_t ts) {
@@ -56,11 +57,21 @@ std::vector<std::string> InMemoryStore::lrang(const std::string& list, int start
         start = (start < 0) ? std::max(0, size + start) : start;
         end   = (end   < 0) ? std::max(0, size + end )  : end;
         std::cout << "start " << start << "end " << end << " v.size() " << v.size() << std::endl;
-        while(start <= end && start < v.size()) {
-            result.push_back(v[start++]);
+        auto l_it = std::next(v.begin(), start);
+        for(int i=start; i<=end && i < v.size(); i++, l_it++) {
+            result.push_back(*l_it);
         }
     }
     return result;
+}
+
+int InMemoryStore::prepend(const std::string& list, std::vector<std::string>& values) {
+    if(values.size() == 0) return 0;
+    auto& v = lists_[list];
+    for(auto& val : values) {
+        v.push_front(val);
+    }
+    return v.size();
 }
 
 int InMemoryStore::append(const std::string& list, std::vector<std::string>& values) {

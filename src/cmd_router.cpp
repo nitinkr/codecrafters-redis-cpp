@@ -91,4 +91,16 @@ void CmdRouter::init_cmd_reg() {
             auto res = in_memory_store_.lrang(key, start, end);
             return RespEncoder::encode_array(res);
         };
+
+        cmds_["LPUSH"] = [this](Command &cmd) -> std::string {
+            assert(cmd.name == "LPUSH");
+            if (cmd.args.size() < 2) {
+                return RespEncoder::encode_error("Invalid command");
+            }
+            std::string key = cmd.args[0].to_string();
+            // TODO move to span
+            std::vector<std::string> values;
+            for(int i=1; i< cmd.args.size(); i++) { values.push_back(cmd.args[i].to_string()); }
+            return RespEncoder::encode_int(in_memory_store_.prepend(key,values));
+        };
 }
