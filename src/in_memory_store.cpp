@@ -65,7 +65,7 @@ std::vector<std::string> InMemoryStore::lrang(const std::string& list, int start
     return result;
 }
 
-int InMemoryStore::list_length(std::string& list) {
+int InMemoryStore::list_length(const std::string& list) {
     if (auto it = lists_.find(list); it != lists_.end()) {
         return it->second.size();
     }
