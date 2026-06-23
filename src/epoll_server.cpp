@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
@@ -10,6 +11,7 @@
 #include <unistd.h>
 #include "epoll_server.h"
 #include "redis_types.h"
+#include "resp_encoder.h"
 #include "resp_parser.h"
 #include "cmd_router.h"
 
@@ -17,6 +19,14 @@ void EpollServer::del_connection(Connection *conn) {
     if(conn != nullptr) {
         epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, conn->fd_, nullptr);
         close(conn->fd_);
+        auto itr = blocked_cmds_.begin();
+        while(itr != blocked_cmds_.end()) {
+            if(itr->conn_ == conn) {
+                itr = blocked_cmds_.erase(itr);
+                break;
+            }
+            itr++;
+        }
         delete conn;
     }
 }
@@ -122,6 +132,41 @@ void EpollServer::handle_new_connection() {
     ev.events  = EPOLLIN;
     epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, client_fd, &ev); 
 }
+void EpollServer::drain_exp_conn(Connection* conn) {
+    std::string resp = RespEncoder::null_bulk_array_;
+    memcpy(conn->send_buff_ + conn->send_len_, resp.c_str(), resp.length()); 
+    conn->send_len_ += resp.length();
+    conn->recv_idx_ = 0;
+    epoll_event ev;
+    ev.data.ptr = conn;
+    ev.events   = EPOLLOUT;
+    epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, conn->fd_, &ev);
+}
+
+void EpollServer::drain_blocked_queue() {
+    auto curr_ts = in_memory_store_.current_time();
+    auto itr = blocked_cmds_.begin();
+    auto curr_time = in_memory_store_.current_time();
+    while(itr != blocked_cmds_.end()) {
+        if(itr->ts_ == 0 || itr->ts_ > curr_time) {
+            itr++;
+            continue;
+        }
+        drain_exp_conn(itr->conn_);
+        itr = blocked_cmds_.erase(itr);
+    }
+}
+
+int64_t EpollServer::find_min_waiting_time() {
+    int64_t ts = -1;
+    int curr_time = in_memory_store_.current_time();
+    for(auto& c : blocked_cmds_) {
+        if (c.ts_ == 0 || c.ts_ < curr_time) continue;
+        auto d = c.ts_ - curr_time;
+        if (ts == -1 || ts > d) ts = d;
+    }
+    return ts;
+}
 
 void EpollServer::start() {
     sockfd_ = create_bind_listen();
@@ -138,10 +183,12 @@ void EpollServer::start() {
     conn = new Connection(sockfd_);
     epoll_ev.data.ptr = conn;
     epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, sockfd_, &epoll_ev); 
-    int t = 0;
+    int t = 0, ts = -1;
     while(true) {
-        std::cout << "waiting t= " << (t++) << std::endl;
-        num_fds = epoll_wait(epoll_fd_, events, MAXEVENT, -1);
+        ts = find_min_waiting_time(); 
+        std::cout << "waiting t= " << (t++) << " wait time " << ts << std::endl;
+        num_fds = epoll_wait(epoll_fd_, events, MAXEVENT, ts);
+        drain_blocked_queue();
         for(int i=0; i < num_fds; i++) {
             conn   = (Connection *) events[i].data.ptr;
             new_fd = conn->fd_;
@@ -175,21 +222,22 @@ void EpollServer::start() {
     close(sockfd_);
     close(epoll_fd_);
 }
+
 void EpollServer::drain_waiting_room(Command& cmd) {
-    if(cmd.args_.empty()) return;
+    if(cmd.args_.empty() || blocked_cmds_.empty()) return;
     std::string key = cmd.args_[0].to_string();
     epoll_event ev;
     Connection *conn = nullptr;
-    if(auto itr = waiting_room_.find(key); itr != waiting_room_.end()) {
-        auto& q = itr->second; 
-        while(!q.empty()) {
-            auto& c = q.front();
-            std::cout << "tryint to execute blocked cmd again fd " << c.conn_->fd_ << " args " << c.name_ << std::endl; 
-            if(!process_command(c)) {
-                break;
-            }
-            q.pop();
+    auto itr = blocked_cmds_.begin();
+    std::cout << "trying to unblock any one for key " << key << std::endl;
+    while(itr != blocked_cmds_.end()) {
+        if (itr->args_[0].to_string() != key) { itr++; continue;};
+        auto& c = *itr; 
+        std::cout << "tryint to execute blocked cmd again fd " << c.conn_->fd_ << " args " << c.name_ << std::endl; 
+        if(!process_command(c)) {
+               break;
         }
+        itr = blocked_cmds_.erase(itr);
     }
 }
 
@@ -199,18 +247,20 @@ void EpollServer::add_to_waiter(Command cmd) {
     epoll_event ev;
     ev.data.ptr = conn;
     ev.events   = EPOLLRDHUP;
-    epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, conn->fd_, &ev);
-    std::cout << "***************************************Adding cmd to waiting queue fd " << conn->fd_ << " name " << cmd.name_ << std::endl;
-    waiting_room_[key].push(std::move(cmd));
+    epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, conn->fd_, &ev);
+    auto ts_str = cmd.args_[1].to_string();
+    if(ts_str != "0") {
+        cmd.ts_ = in_memory_store_.current_time() + std::stod(ts_str) * 1000;
+    }
+    blocked_cmds_.push_back(cmd); 
 }
 
 
 bool EpollServer::process_command(Command& cmd) {
     cmd.state_ = Command::READY;
-    router_.process_cmd(cmd);    
+    router_.process_cmd(cmd);
     if(cmd.state_ == Command::BLOCKED) return false;
     Connection *conn = cmd.conn_;
-    std::cout << "ah!!!!!!!!!!!!!!!!!!!!!!!! finally unblocked fd: " << conn->fd_ << std::endl;
     for(auto& str : cmd.result_) {
         memcpy(conn->send_buff_ + conn->send_len_, str.c_str(), str.length()); 
         conn->send_len_ += str.length();

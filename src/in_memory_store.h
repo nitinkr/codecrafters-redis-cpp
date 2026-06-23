@@ -14,9 +14,9 @@ public:
     std::vector<std::string> list_pop(const std::string& list, int count);
     int list_length(const std::string& list);
     std::vector<std::string> list_range(const std::string& list, int start, int end);
+    int64_t current_time();
     
 private:
-    int64_t current_time();
     bool is_expired(const std::string &key);
     void erase(const std::string &key);
     void insert_ts(const std::string &key, int64_t ts);

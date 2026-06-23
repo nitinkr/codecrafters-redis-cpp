@@ -5,7 +5,7 @@
 #include <vector>
 #define BACKLOG  20
 #define MAXEVENT 128
-#define BUFFERSIZE 4096 
+#define BUFFERSIZE 4096
 
 struct Connection {
     Connection(int fd): fd_(fd) {} 
@@ -59,12 +59,11 @@ struct Command {
         }
         state_ = Command::READY;
         conn_ = nullptr; 
-        exp_time_ = 0;
     }
     state state_;
     std::string name_;
     std::vector<RespValue> args_;
     std::vector<std::string> result_;
     Connection *conn_ = nullptr; 
-    int64_t    exp_time_ = 0;
+    int64_t ts_ = 0;
 };

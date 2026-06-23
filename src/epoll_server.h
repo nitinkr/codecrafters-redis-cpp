@@ -1,9 +1,11 @@
 #ifndef EPOLL_SERVER_H
 #define  EPOLL_SERVER_H
 
+#include <cstdint>
 #include <queue>
 #include <sys/epoll.h>
 #include <unordered_map>
+#include <unordered_set>
 #include "in_memory_store.h"
 #include "cmd_router.h"
 #include "redis_types.h"
@@ -24,10 +26,13 @@ private:
     void add_to_waiter(Command cmd);
     void drain_waiting_room(Command& cmd);
     bool is_error_event(uint32_t ev) { return (ev & (EPOLLHUP | EPOLLERR)); } 
+    void drain_blocked_queue();
+    void drain_exp_conn(Connection* conn);
+    int64_t find_min_waiting_time();
     int port_;
     int sockfd_, epoll_fd_;
     InMemoryStore in_memory_store_;
-    std::unordered_map<std::string, std::queue<Command>> waiting_room_;
+    std::list<Command> blocked_cmds_;
     CmdRouter router_;
 };
 
