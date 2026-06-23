@@ -90,7 +90,6 @@ int InMemoryStore::list_append(const std::string& list, std::vector<std::string>
 }
 
 std::vector<std::string> InMemoryStore::list_pop(const std::string& list, int count) {
-    // std::cout << "list pop called to pop " << count << " from " << list << std::endl; 
     std::vector<std::string> result;
     if (auto it = lists_.find(list); it != lists_.end()) {
         auto& l = it->second;

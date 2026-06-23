@@ -1,7 +1,9 @@
 #ifndef EPOLL_SERVER_H
 #define  EPOLL_SERVER_H
 
+#include <queue>
 #include <sys/epoll.h>
+#include <unordered_map>
 #include "in_memory_store.h"
 #include "cmd_router.h"
 #include "redis_types.h"
@@ -15,13 +17,17 @@ private:
     int  create_bind_listen();
     void del_connection(Connection *conn);
     bool process_command(Connection *conn);
+    bool process_command(Command &cmd);
     void handle_new_connection();
-    int handle_read(Connection  *conn);
+    int  handle_read(Connection  *conn);
     void handle_write(Connection *conn);
+    void add_to_waiter(Command cmd);
+    void drain_waiting_room(Command& cmd);
     bool is_error_event(uint32_t ev) { return (ev & (EPOLLHUP | EPOLLERR)); } 
     int port_;
     int sockfd_, epoll_fd_;
     InMemoryStore in_memory_store_;
+    std::unordered_map<std::string, std::queue<Command>> waiting_room_;
     CmdRouter router_;
 };
 

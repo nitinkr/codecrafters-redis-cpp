@@ -14,6 +14,8 @@ bool RespParser::parse_all() {
     while(is_valid_ && !is_end()) {
         parse();
         cmds_.emplace_back(values_);
+        auto& c = cmds_.back();
+        c.conn_ = conn_;
         values_.clear();
     }
     return is_valid_;

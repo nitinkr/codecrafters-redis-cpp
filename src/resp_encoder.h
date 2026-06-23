@@ -11,5 +11,5 @@ public:
     static std::string encode_int(int64_t i) { return ":" + std::to_string(i) + "\r\n"; }
     static std::string encode_string(const std::string &str);
     static std::string encode_error(const std::string  &str) { return str;}
-    static std::string encode_array(std::vector<std::string>& arr);
+    static std::string encode_array(const std::vector<std::string>& arr);
 };

@@ -1,4 +1,5 @@
 #pragma once 
+#include <cstdint>
 #include <string>
 #include <variant>
 #include <vector>
@@ -41,12 +42,29 @@ struct RespValue {
 };
 
 struct Command {
-    std::string name;
-    std::vector<RespValue> args;
+    enum state {
+        READY,
+        FINISHED,
+        BLOCKED,
+        UNBLOCKING,
+        WAITING,
+        EXPIRED,
+        INVALID,
+    };
+
     Command(std::vector<RespValue>& tokens) {
-        name = tokens[0].to_string();
+        name_ = tokens[0].to_string();
         for (int i=1; i<tokens.size(); i++) {
-            args.push_back(tokens[i]);
+            args_.push_back(tokens[i]);
         }
+        state_ = Command::READY;
+        conn_ = nullptr; 
+        exp_time_ = 0;
     }
+    state state_;
+    std::string name_;
+    std::vector<RespValue> args_;
+    std::vector<std::string> result_;
+    Connection *conn_ = nullptr; 
+    int64_t    exp_time_ = 0;
 };

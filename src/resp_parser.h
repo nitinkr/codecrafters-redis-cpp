@@ -10,11 +10,11 @@
 
 class RespParser {
 public:
-    RespParser(Connection *conn) : buff_(conn->recv_buff_), length_(conn->recv_idx_),
+    RespParser(Connection *conn) : conn_(conn), buff_(conn->recv_buff_), length_(conn->recv_idx_),
                                    current_(0), is_valid_(true) {};
     bool IsValid() { return is_valid_; }
-    bool parse_all();
     bool parse();
+    bool parse_all();
     std::vector<Command>& get_cmds() { return cmds_; }
 private:
     void parse_string();
@@ -28,6 +28,7 @@ private:
     bool is_end() { return current_ >= length_; }
     bool is_crlf();
     int  parse_length();
+    Connection *conn_;
     const char *buff_;
     int current_;
     const int length_;

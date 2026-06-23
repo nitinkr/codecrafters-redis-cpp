@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include "epoll_server.h"
+#include "redis_types.h"
 #include "resp_parser.h"
 #include "cmd_router.h"
 
@@ -66,7 +67,7 @@ int EpollServer::create_bind_listen() {
     int reuse = 1;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family   = AF_INET;
-    hints.ai_socktype =SOCK_STREAM;
+    hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags    = AI_PASSIVE;
     std::string port_str = std::to_string(port_);
 
@@ -174,6 +175,53 @@ void EpollServer::start() {
     close(sockfd_);
     close(epoll_fd_);
 }
+void EpollServer::drain_waiting_room(Command& cmd) {
+    if(cmd.args_.empty()) return;
+    std::string key = cmd.args_[0].to_string();
+    epoll_event ev;
+    Connection *conn = nullptr;
+    if(auto itr = waiting_room_.find(key); itr != waiting_room_.end()) {
+        auto& q = itr->second; 
+        while(!q.empty()) {
+            auto& c = q.front();
+            std::cout << "tryint to execute blocked cmd again fd " << c.conn_->fd_ << " args " << c.name_ << std::endl; 
+            if(!process_command(c)) {
+                break;
+            }
+            q.pop();
+        }
+    }
+}
+
+void EpollServer::add_to_waiter(Command cmd) {
+    std::string key = cmd.args_[0].to_string();
+    Connection *conn = cmd.conn_;
+    epoll_event ev;
+    ev.data.ptr = conn;
+    ev.events   = EPOLLRDHUP;
+    epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, conn->fd_, &ev);
+    std::cout << "***************************************Adding cmd to waiting queue fd " << conn->fd_ << " name " << cmd.name_ << std::endl;
+    waiting_room_[key].push(std::move(cmd));
+}
+
+
+bool EpollServer::process_command(Command& cmd) {
+    cmd.state_ = Command::READY;
+    router_.process_cmd(cmd);    
+    if(cmd.state_ == Command::BLOCKED) return false;
+    Connection *conn = cmd.conn_;
+    std::cout << "ah!!!!!!!!!!!!!!!!!!!!!!!! finally unblocked fd: " << conn->fd_ << std::endl;
+    for(auto& str : cmd.result_) {
+        memcpy(conn->send_buff_ + conn->send_len_, str.c_str(), str.length()); 
+        conn->send_len_ += str.length();
+    }
+    conn->recv_idx_ = 0;
+    epoll_event ev;
+    ev.data.ptr = conn;
+    ev.events   = EPOLLOUT;
+    epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, conn->fd_, &ev);
+    return true;
+}
 
 bool EpollServer::process_command(Connection *conn) {
     RespParser r(conn);
@@ -187,11 +235,28 @@ bool EpollServer::process_command(Connection *conn) {
         epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, conn->fd_, &ev);
         return false;
     }
-    auto results = router_.process(conn->fd_, r.get_cmds());
-    for(auto& str : results) {
-        memcpy(conn->send_buff_ + conn->send_len_, str.c_str(), str.length()); 
-        conn->send_len_ += str.length();
+    auto cmds = r.get_cmds();
+    router_.process(conn->fd_, cmds);
+    bool blocked = false;
+    for(auto& c : cmds) {
+        if(c.state_ == Command::BLOCKED) {
+            add_to_waiter(std::move(c));
+            blocked = true;
+            continue;
+        }
+
+        if(c.state_ == Command::Command::FINISHED || c.state_ == Command::UNBLOCKING) {
+            std::cout << c.name_ << "is finsished " << std::endl;
+            for(auto& str : c.result_) {
+                memcpy(conn->send_buff_ + conn->send_len_, str.c_str(), str.length()); 
+                conn->send_len_ += str.length();
+            }
+        }
+
+        if (c.state_ == Command::UNBLOCKING) {
+            drain_waiting_room(c);
+        }
     }
-    conn->recv_idx_ = 0;
+    if(!blocked) conn->recv_idx_ = 0;
     return true;
 }

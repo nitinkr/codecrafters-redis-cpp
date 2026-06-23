@@ -1,7 +1,7 @@
 #include <string>
 #include "resp_encoder.h"
 
-std::string RespEncoder::encode_array(std::vector<std::string>& arr) {
+std::string RespEncoder::encode_array(const std::vector<std::string>& arr) {
     std::string res = "*" + std::to_string(arr.size()) + "\r\n"; 
     for(auto& s : arr) res += encode_string(s);
     return res;
