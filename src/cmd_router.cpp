@@ -47,6 +47,20 @@ void CmdRouter::init_cmd_reg() {
             assert(cmd.args_.size() == 1);
             cmd.result_.push_back(RespEncoder::encode_string(cmd.args_[0].to_string()));
         };
+        
+        cmds_["TYPE"] = [this](Command& cmd) -> void {
+            assert(cmd.name_ == "TYPE");
+            if (cmd.args_.size() == 0) {
+                cmd.result_.push_back((RespEncoder::encode_error("Invalid command")));
+                return;
+            }
+            std::string value;
+            if(in_memory_store_.get(cmd.args_[0].to_string(), value)) {
+                cmd.result_.push_back(RespEncoder::encode_simple_string("string"));
+                return;
+            }
+            cmd.result_.push_back(RespEncoder::encode_simple_string("none"));
+        };
 
         cmds_["SET"] = [this](Command &cmd) -> void {
             if (cmd.args_.size() < 2) {
